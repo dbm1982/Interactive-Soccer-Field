@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Soccer Goal Angle Simulator</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1726;
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #app {
+      margin-top: 20px;
+      max-width: 900px;
+      width: 100%;
+    }
+    .field-wrapper {
+      background: #0b5c2c;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+    svg {
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+      background: #0b5c2c;
+    }
+    .goal-line {
+      stroke: #ffffff;
+      stroke-width: 4;
+    }
+    .box-line {
+      stroke: rgba(255,255,255,0.4);
+      stroke-width: 2;
+      stroke-dasharray: 6 4;
+    }
+    .triangle-line {
+      stroke: #ffcc00;
+      stroke-width: 3;
+    }
+    .post {
+      fill: #ffffff;
+      stroke: #000000;
+      stroke-width: 1;
+    }
+    .shooter {
+      fill: #ff4444;
+      stroke: #ffffff;
+      stroke-width: 2;
+      cursor: grab;
+    }
+    .shooter.dragging {
+      cursor: grabbing;
+    }
+    .label {
+      fill: #ffffff;
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .hud {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+    .hud-card {
+      background: #111827;
+      border-radius: 6px;
+      padding: 10px 12px;
+      border: 1px solid #1f2937;
+    }
+    .hud-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+    .hud-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #f9fafb;
+    }
+    .hud-sub {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="field-wrapper">
+      <!-- Coordinate system: 0,0 top-left; 800x500 canvas -->
+      <svg id="field" viewBox="0 0 800 500">
+        <!-- Pitch outline (simple) -->
+        <rect x="40" y="40" width="720" height="420" fill="none" stroke="#ffffff" stroke-width="2" />
+
+        <!-- Goal line at bottom center -->
+        <!-- Posts A and B -->
+        <line id="goal-line" class="goal-line" x1="300" y1="440" x2="500" y2="440" />
+
+        <!-- 6-yard box (approx) -->
+        <rect x="320" y="380" width="160" height="60" class="box-line" />
+
+        <!-- 18-yard box (approx) -->
+        <rect x="260" y="300" width="280" height="140" class="box-line" />
+
+        <!-- Triangle lines -->
+        <line id="line-AC" class="triangle-line" x1="300" y1="440" x2="400" y2="220" />
+        <line id="line-BC" class="triangle-line" x1="500" y1="440" x2="400" y2="220" />
+        <line id="line-AB" class="triangle-line" x1="300" y1="440" x2="500" y2="440" />
+
+        <!-- Goal posts -->
+        <circle id="post-A" class="post" cx="300" cy="440" r="6" />
+        <circle id="post-B" class="post" cx="500" cy="440" r="6" />
+
+        <!-- Shooter (draggable) -->
+        <circle id="shooter" class="shooter" cx="400" cy="220" r="9" />
+
+        <!-- Labels -->
+        <text id="label-A" class="label" x="290" y="430">A (Left Post)</text>
+        <text id="label-B" class="label" x="490" y="430">B (Right Post)</text>
+        <text id="label-C" class="label" x="410" y="210">Shooter (C)</text>
+      </svg>
+    </div>
+
+    <div class="hud">
+      <div class="hud-card">
+        <div class="hud-title">Goal width (AB)</div>
+        <div id="hud-ab" class="hud-value">–</div>
+        <div class="hud-sub">Distance between posts</div>
+      </div>
+      <div class="hud-card">
+        <div class="hud-title">Distance to left post (AC)</div>
+        <div id="hud-ac" class="hud-value">–</div>
+        <div class="hud-sub">Shooter → left post</div>
+      </div>
+      <div class="hud-card">
+        <div class="hud-title">Distance to right post (BC)</div>
+        <div id="hud-bc" class="hud-value">–</div>
+        <div class="hud-sub">Shooter → right post</div>
+      </div>
+      <div class="hud-card">
+        <div class="hud-title">Shooting angle at C</div>
+        <div id="hud-angle" class="hud-value">–°</div>
+        <div class="hud-sub">Angle between lines to each post</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Basic geometry helpers
+    function distance(p1, p2) {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // Law of cosines: angle at C between CA and CB
+    function angleAtC(a, b, c) {
+      // a = BC, b = AC, c = AB
+      // c^2 = a^2 + b^2 - 2ab cos(C)
+      // cos(C) = (a^2 + b^2 - c^2) / (2ab)
+      if (a === 0 || b === 0) return 0;
+      const cosC = (a * a + b * b - c * c) / (2 * a * b);
+      const clamped = Math.max(-1, Math.min(1, cosC));
+      const rad = Math.acos(clamped);
+      return (rad * 180) / Math.PI;
+    }
+
+    (function init() {
+      const svg = document.getElementById("field");
+      const shooter = document.getElementById("shooter");
+
+      const lineAC = document.getElementById("line-AC");
+      const lineBC = document.getElementById("line-BC");
+      const lineAB = document.getElementById("line-AB");
+
+      const hudAB = document.getElementById("hud-ab");
+      const hudAC = document.getElementById("hud-ac");
+      const hudBC = document.getElementById("hud-bc");
+      const hudAngle = document.getElementById("hud-angle");
+
+      const postA = { x: 300, y: 440 };
+      const postB = { x: 500, y: 440 };
+
+      let shooterPos = { x: 400, y: 220 };
+      let dragging = false;
+
+      function updateGeometry() {
+        // Update triangle lines
+        lineAC.setAttribute("x1", postA.x);
+        lineAC.setAttribute("y1", postA.y);
+        lineAC.setAttribute("x2", shooterPos.x);
+        lineAC.setAttribute("y2", shooterPos.y);
+
+        lineBC.setAttribute("x1", postB.x);
+        lineBC.setAttribute("y1", postB.y);
+        lineBC.setAttribute("x2", shooterPos.x);
+        lineBC.setAttribute("y2", shooterPos.y);
+
+        lineAB.setAttribute("x1", postA.x);
+        lineAB.setAttribute("y1", postA.y);
+        lineAB.setAttribute("x2", postB.x);
+        lineAB.setAttribute("y2", postB.y);
+
+        // Distances (in "units" – you can map to yards/meters later)
+        const AB = distance(postA, postB);
+        const AC = distance(postA, shooterPos);
+        const BC = distance(postB, shooterPos);
+
+        const angleC = angleAtC(BC, AC, AB);
+
+        hudAB.textContent = AB.toFixed(1);
+        hudAC.textContent = AC.toFixed(1);
+        hudBC.textContent = BC.toFixed(1);
+        hudAngle.textContent = angleC.toFixed(1) + "°";
+      }
+
+      function setShooterPosition(x, y) {
+        // Clamp inside pitch bounds (slightly inset)
+        const minX = 60;
+        const maxX = 740;
+        const minY = 60;
+        const maxY = 430;
+
+        shooterPos.x = Math.max(minX, Math.min(maxX, x));
+        shooterPos.y = Math.max(minY, Math.min(maxY, y));
+
+        shooter.setAttribute("cx", shooterPos.x);
+        shooter.setAttribute("cy", shooterPos.y);
+
+        // Move label near shooter
+        const labelC = document.getElementById("label-C");
+        labelC.setAttribute("x", shooterPos.x + 10);
+        labelC.setAttribute("y", shooterPos.y - 10);
+
+        updateGeometry();
+      }
+
+      // Convert mouse/touch to SVG coordinates
+      function getSVGPoint(evt) {
+        const pt = svg.createSVGPoint();
+        if (evt.touches && evt.touches[0]) {
+          pt.x = evt.touches[0].clientX;
+          pt.y = evt.touches[0].clientY;
+        } else {
+          pt.x = evt.clientX;
+          pt.y = evt.clientY;
+        }
+        const screenCTM = svg.getScreenCTM();
+        return pt.matrixTransform(screenCTM.inverse());
+      }
+
+      function onPointerDown(evt) {
+        dragging = true;
+        shooter.classList.add("dragging");
+        const p = getSVGPoint(evt);
+        setShooterPosition(p.x, p.y);
+        evt.preventDefault();
+      }
+
+      function onPointerMove(evt) {
+        if (!dragging) return;
+        const p = getSVGPoint(evt);
+        setShooterPosition(p.x, p.y);
+        evt.preventDefault();
+      }
+
+      function onPointerUp(evt) {
+        dragging = false;
+        shooter.classList.remove("dragging");
+        evt.preventDefault();
+      }
+
+      // Mouse events
+      shooter.addEventListener("mousedown", onPointerDown);
+      window.addEventListener("mousemove", onPointerMove);
+      window.addEventListener("mouseup", onPointerUp);
+
+      // Touch events
+      shooter.addEventListener("touchstart", onPointerDown, { passive: false });
+      window.addEventListener("touchmove", onPointerMove, { passive: false });
+      window.addEventListener("touchend", onPointerUp, { passive: false });
+      window.addEventListener("touchcancel", onPointerUp, { passive: false });
+
+      // Initial render
+      updateGeometry();
+    })();
+  </script>
+</body>
+</html>
