@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <title>Soccer Goal Angle Simulator</title>
   <style>
+    html, body {
+      overflow-x: hidden;
+    }
     body {
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -29,6 +32,7 @@
       height: auto;
       border-radius: 6px;
       background: #0b5c2c;
+      display: block;
     }
     .goal-line {
       stroke: #ffffff;
@@ -95,11 +99,23 @@
 </head>
 <body>
   <div id="app">
+
+    <!-- Goal width selector -->
+    <div style="margin-bottom: 10px; text-align:center;">
+      <label style="font-size:14px;">Goal Width: </label>
+      <select id="goal-select" style="font-size:14px; padding:4px;">
+        <option value="21">21 ft (Full)</option>
+        <option value="18">18 ft (9v9)</option>
+        <option value="12">12 ft (7v7)</option>
+        <option value="6">6 ft (5v5)</option>
+      </select>
+    </div>
+
     <div class="field-wrapper">
       <svg id="field" viewBox="0 0 800 500">
         <rect x="40" y="40" width="720" height="420" fill="none" stroke="#ffffff" stroke-width="2" />
 
-        <line id="goal-line" class="goal-line" x1="300" y1="440" x2="500" y2="440" />
+        <line id="goal-line" class="goal-line" />
 
         <rect x="320" y="380" width="160" height="60" class="box-line" />
         <rect x="260" y="300" width="280" height="140" class="box-line" />
@@ -108,14 +124,14 @@
         <line id="line-BC" class="triangle-line" />
         <line id="line-AB" class="triangle-line" />
 
-        <circle id="post-A" class="post" cx="300" cy="440" r="6" />
-        <circle id="post-B" class="post" cx="500" cy="440" r="6" />
+        <circle id="post-A" class="post" r="6" />
+        <circle id="post-B" class="post" r="6" />
 
         <circle id="shooter" class="shooter" cx="400" cy="220" r="9" />
 
-        <text id="label-A" class="label" x="290" y="430">A (Left Post)</text>
-        <text id="label-B" class="label" x="490" y="430">B (Right Post)</text>
-        <text id="label-C" class="label" x="410" y="210">Shooter (C)</text>
+        <text id="label-A" class="label">A (Left Post)</text>
+        <text id="label-B" class="label">B (Right Post)</text>
+        <text id="label-C" class="label">Shooter (C)</text>
       </svg>
     </div>
 
@@ -146,6 +162,7 @@
   <script>
     const PX_PER_FOOT = 200 / 24;
     const FEET = px => px / PX_PER_FOOT;
+    const PX = ft => ft * PX_PER_FOOT;
 
     function distance(p1, p2) {
       const dx = p2.x - p1.x;
@@ -163,18 +180,21 @@
     (function init() {
       const svg = document.getElementById("field");
       const shooter = document.getElementById("shooter");
+      const goalSelect = document.getElementById("goal-select");
 
       const lineAC = document.getElementById("line-AC");
       const lineBC = document.getElementById("line-BC");
       const lineAB = document.getElementById("line-AB");
+      const goalLine = document.getElementById("goal-line");
 
       const hudAB = document.getElementById("hud-ab");
       const hudAC = document.getElementById("hud-ac");
       const hudBC = document.getElementById("hud-bc");
       const hudAngle = document.getElementById("hud-angle");
 
-      const postA = { x: 300, y: 440 };
-      const postB = { x: 500, y: 440 };
+      const labelA = document.getElementById("label-A");
+      const labelB = document.getElementById("label-B");
+      const labelC = document.getElementById("label-C");
 
       const labelAB = document.createElementNS("http://www.w3.org/2000/svg", "text");
       const labelAC = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -187,7 +207,31 @@
       });
 
       let shooterPos = { x: 400, y: 220 };
+      let postA = { x: 300, y: 440 };
+      let postB = { x: 500, y: 440 };
       let dragging = false;
+
+      function updateGoalWidth() {
+        const ft = Number(goalSelect.value);
+        const px = PX(ft);
+
+        const center = 400;
+        postA.x = center - px/2;
+        postB.x = center + px/2;
+
+        document.getElementById("post-A").setAttribute("cx", postA.x);
+        document.getElementById("post-B").setAttribute("cx", postB.x);
+
+        labelA.setAttribute("x", postA.x - 10);
+        labelB.setAttribute("x", postB.x - 10);
+
+        goalLine.setAttribute("x1", postA.x);
+        goalLine.setAttribute("y1", postA.y);
+        goalLine.setAttribute("x2", postB.x);
+        goalLine.setAttribute("y2", postB.y);
+
+        updateGeometry();
+      }
 
       function updateGeometry() {
         lineAC.setAttribute("x1", postA.x);
@@ -240,7 +284,6 @@
         shooter.setAttribute("cx", shooterPos.x);
         shooter.setAttribute("cy", shooterPos.y);
 
-        const labelC = document.getElementById("label-C");
         labelC.setAttribute("x", shooterPos.x + 10);
         labelC.setAttribute("y", shooterPos.y - 10);
 
@@ -272,7 +315,7 @@
         shooter.classList.remove("dragging");
       });
 
-      updateGeometry();
+      updateGoalWidth();
     })();
   </script>
 </body>
