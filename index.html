@@ -96,34 +96,23 @@
 <body>
   <div id="app">
     <div class="field-wrapper">
-      <!-- Coordinate system: 0,0 top-left; 800x500 canvas -->
       <svg id="field" viewBox="0 0 800 500">
-        <!-- Pitch outline (simple) -->
         <rect x="40" y="40" width="720" height="420" fill="none" stroke="#ffffff" stroke-width="2" />
 
-        <!-- Goal line at bottom center -->
-        <!-- Posts A and B -->
         <line id="goal-line" class="goal-line" x1="300" y1="440" x2="500" y2="440" />
 
-        <!-- 6-yard box (approx) -->
         <rect x="320" y="380" width="160" height="60" class="box-line" />
-
-        <!-- 18-yard box (approx) -->
         <rect x="260" y="300" width="280" height="140" class="box-line" />
 
-        <!-- Triangle lines -->
-        <line id="line-AC" class="triangle-line" x1="300" y1="440" x2="400" y2="220" />
-        <line id="line-BC" class="triangle-line" x1="500" y1="440" x2="400" y2="220" />
-        <line id="line-AB" class="triangle-line" x1="300" y1="440" x2="500" y2="440" />
+        <line id="line-AC" class="triangle-line" />
+        <line id="line-BC" class="triangle-line" />
+        <line id="line-AB" class="triangle-line" />
 
-        <!-- Goal posts -->
         <circle id="post-A" class="post" cx="300" cy="440" r="6" />
         <circle id="post-B" class="post" cx="500" cy="440" r="6" />
 
-        <!-- Shooter (draggable) -->
         <circle id="shooter" class="shooter" cx="400" cy="220" r="9" />
 
-        <!-- Labels -->
         <text id="label-A" class="label" x="290" y="430">A (Left Post)</text>
         <text id="label-B" class="label" x="490" y="430">B (Right Post)</text>
         <text id="label-C" class="label" x="410" y="210">Shooter (C)</text>
@@ -155,23 +144,20 @@
   </div>
 
   <script>
-    // Basic geometry helpers
+    const PX_PER_FOOT = 200 / 24;
+    const FEET = px => px / PX_PER_FOOT;
+
     function distance(p1, p2) {
       const dx = p2.x - p1.x;
       const dy = p2.y - p1.y;
       return Math.sqrt(dx * dx + dy * dy);
     }
 
-    // Law of cosines: angle at C between CA and CB
     function angleAtC(a, b, c) {
-      // a = BC, b = AC, c = AB
-      // c^2 = a^2 + b^2 - 2ab cos(C)
-      // cos(C) = (a^2 + b^2 - c^2) / (2ab)
       if (a === 0 || b === 0) return 0;
-      const cosC = (a * a + b * b - c * c) / (2 * a * b);
+      const cosC = (a*a + b*b - c*c) / (2*a*b);
       const clamped = Math.max(-1, Math.min(1, cosC));
-      const rad = Math.acos(clamped);
-      return (rad * 180) / Math.PI;
+      return Math.acos(clamped) * 180 / Math.PI;
     }
 
     (function init() {
@@ -190,11 +176,20 @@
       const postA = { x: 300, y: 440 };
       const postB = { x: 500, y: 440 };
 
+      const labelAB = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      const labelAC = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      const labelBC = document.createElementNS("http://www.w3.org/2000/svg", "text");
+
+      [labelAB, labelAC, labelBC].forEach(l => {
+        l.setAttribute("class", "label");
+        l.setAttribute("font-size", "14");
+        svg.appendChild(l);
+      });
+
       let shooterPos = { x: 400, y: 220 };
       let dragging = false;
 
       function updateGeometry() {
-        // Update triangle lines
         lineAC.setAttribute("x1", postA.x);
         lineAC.setAttribute("y1", postA.y);
         lineAC.setAttribute("x2", shooterPos.x);
@@ -210,33 +205,41 @@
         lineAB.setAttribute("x2", postB.x);
         lineAB.setAttribute("y2", postB.y);
 
-        // Distances (in "units" – you can map to yards/meters later)
-        const AB = distance(postA, postB);
-        const AC = distance(postA, shooterPos);
-        const BC = distance(postB, shooterPos);
+        const AB_px = distance(postA, postB);
+        const AC_px = distance(postA, shooterPos);
+        const BC_px = distance(postB, shooterPos);
 
-        const angleC = angleAtC(BC, AC, AB);
+        const AB = FEET(AB_px);
+        const AC = FEET(AC_px);
+        const BC = FEET(BC_px);
 
-        hudAB.textContent = AB.toFixed(1);
-        hudAC.textContent = AC.toFixed(1);
-        hudBC.textContent = BC.toFixed(1);
+        const angleC = angleAtC(BC_px, AC_px, AB_px);
+
+        hudAB.textContent = AB.toFixed(1) + " ft";
+        hudAC.textContent = AC.toFixed(1) + " ft";
+        hudBC.textContent = BC.toFixed(1) + " ft";
         hudAngle.textContent = angleC.toFixed(1) + "°";
+
+        labelAB.setAttribute("x", (postA.x + postB.x)/2);
+        labelAB.setAttribute("y", postA.y - 10);
+        labelAB.textContent = AB.toFixed(1) + " ft";
+
+        labelAC.setAttribute("x", (postA.x + shooterPos.x)/2);
+        labelAC.setAttribute("y", (postA.y + shooterPos.y)/2);
+        labelAC.textContent = AC.toFixed(1) + " ft";
+
+        labelBC.setAttribute("x", (postB.x + shooterPos.x)/2);
+        labelBC.setAttribute("y", (postB.y + shooterPos.y)/2);
+        labelBC.textContent = BC.toFixed(1) + " ft";
       }
 
       function setShooterPosition(x, y) {
-        // Clamp inside pitch bounds (slightly inset)
-        const minX = 60;
-        const maxX = 740;
-        const minY = 60;
-        const maxY = 430;
-
-        shooterPos.x = Math.max(minX, Math.min(maxX, x));
-        shooterPos.y = Math.max(minY, Math.min(maxY, y));
+        shooterPos.x = Math.max(60, Math.min(740, x));
+        shooterPos.y = Math.max(60, Math.min(430, y));
 
         shooter.setAttribute("cx", shooterPos.x);
         shooter.setAttribute("cy", shooterPos.y);
 
-        // Move label near shooter
         const labelC = document.getElementById("label-C");
         labelC.setAttribute("x", shooterPos.x + 10);
         labelC.setAttribute("y", shooterPos.y - 10);
@@ -244,53 +247,31 @@
         updateGeometry();
       }
 
-      // Convert mouse/touch to SVG coordinates
       function getSVGPoint(evt) {
         const pt = svg.createSVGPoint();
-        if (evt.touches && evt.touches[0]) {
-          pt.x = evt.touches[0].clientX;
-          pt.y = evt.touches[0].clientY;
-        } else {
-          pt.x = evt.clientX;
-          pt.y = evt.clientY;
-        }
-        const screenCTM = svg.getScreenCTM();
-        return pt.matrixTransform(screenCTM.inverse());
+        pt.x = evt.clientX || evt.touches[0].clientX;
+        pt.y = evt.clientY || evt.touches[0].clientY;
+        return pt.matrixTransform(svg.getScreenCTM().inverse());
       }
 
-      function onPointerDown(evt) {
+      shooter.addEventListener("pointerdown", evt => {
         dragging = true;
         shooter.classList.add("dragging");
         const p = getSVGPoint(evt);
         setShooterPosition(p.x, p.y);
-        evt.preventDefault();
-      }
+      });
 
-      function onPointerMove(evt) {
+      window.addEventListener("pointermove", evt => {
         if (!dragging) return;
         const p = getSVGPoint(evt);
         setShooterPosition(p.x, p.y);
-        evt.preventDefault();
-      }
+      });
 
-      function onPointerUp(evt) {
+      window.addEventListener("pointerup", () => {
         dragging = false;
         shooter.classList.remove("dragging");
-        evt.preventDefault();
-      }
+      });
 
-      // Mouse events
-      shooter.addEventListener("mousedown", onPointerDown);
-      window.addEventListener("mousemove", onPointerMove);
-      window.addEventListener("mouseup", onPointerUp);
-
-      // Touch events
-      shooter.addEventListener("touchstart", onPointerDown, { passive: false });
-      window.addEventListener("touchmove", onPointerMove, { passive: false });
-      window.addEventListener("touchend", onPointerUp, { passive: false });
-      window.addEventListener("touchcancel", onPointerUp, { passive: false });
-
-      // Initial render
       updateGeometry();
     })();
   </script>
