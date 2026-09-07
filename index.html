@@ -6,9 +6,10 @@
   <style>
     html, body {
       overflow-x: hidden;
+      margin: 0;
+      padding: 0;
     }
     body {
-      margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #0b1726;
       color: #f5f5f5;
@@ -20,19 +21,24 @@
       margin-top: 20px;
       max-width: 900px;
       width: 100%;
+      overflow: hidden;
     }
     .field-wrapper {
       background: #0b5c2c;
       border-radius: 8px;
       padding: 16px;
       box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      overflow: hidden;
     }
     svg {
       width: 100%;
       height: auto;
-      border-radius: 6px;
-      background: #0b5c2c;
       display: block;
+      overflow: hidden;
+    }
+    .goal-frame {
+      stroke: #ffffff;
+      stroke-width: 6;
     }
     .goal-line {
       stroke: #ffffff;
@@ -113,25 +119,39 @@
 
     <div class="field-wrapper">
       <svg id="field" viewBox="0 0 800 500">
+
+        <!-- Pitch outline -->
         <rect x="40" y="40" width="720" height="420" fill="none" stroke="#ffffff" stroke-width="2" />
 
+        <!-- Goal frame (uprights + crossbar) -->
+        <line id="goal-left-upright" class="goal-frame" />
+        <line id="goal-right-upright" class="goal-frame" />
+        <line id="goal-crossbar" class="goal-frame" />
+
+        <!-- Goal line -->
         <line id="goal-line" class="goal-line" />
 
+        <!-- Boxes -->
         <rect x="320" y="380" width="160" height="60" class="box-line" />
         <rect x="260" y="300" width="280" height="140" class="box-line" />
 
+        <!-- Triangle -->
         <line id="line-AC" class="triangle-line" />
         <line id="line-BC" class="triangle-line" />
         <line id="line-AB" class="triangle-line" />
 
+        <!-- Posts -->
         <circle id="post-A" class="post" r="6" />
         <circle id="post-B" class="post" r="6" />
 
+        <!-- Shooter -->
         <circle id="shooter" class="shooter" cx="400" cy="220" r="9" />
 
+        <!-- Labels -->
         <text id="label-A" class="label">A (Left Post)</text>
         <text id="label-B" class="label">B (Right Post)</text>
         <text id="label-C" class="label">Shooter (C)</text>
+
       </svg>
     </div>
 
@@ -187,6 +207,10 @@
       const lineAB = document.getElementById("line-AB");
       const goalLine = document.getElementById("goal-line");
 
+      const leftUpright = document.getElementById("goal-left-upright");
+      const rightUpright = document.getElementById("goal-right-upright");
+      const crossbar = document.getElementById("goal-crossbar");
+
       const hudAB = document.getElementById("hud-ab");
       const hudAC = document.getElementById("hud-ac");
       const hudBC = document.getElementById("hud-bc");
@@ -229,6 +253,21 @@
         goalLine.setAttribute("y1", postA.y);
         goalLine.setAttribute("x2", postB.x);
         goalLine.setAttribute("y2", postB.y);
+
+        leftUpright.setAttribute("x1", postA.x);
+        leftUpright.setAttribute("y1", postA.y);
+        leftUpright.setAttribute("x2", postA.x);
+        leftUpright.setAttribute("y2", postA.y - 60);
+
+        rightUpright.setAttribute("x1", postB.x);
+        rightUpright.setAttribute("y1", postB.y);
+        rightUpright.setAttribute("x2", postB.x);
+        rightUpright.setAttribute("y2", postB.y - 60);
+
+        crossbar.setAttribute("x1", postA.x);
+        crossbar.setAttribute("y1", postA.y - 60);
+        crossbar.setAttribute("x2", postB.x);
+        crossbar.setAttribute("y2", postB.y - 60);
 
         updateGeometry();
       }
